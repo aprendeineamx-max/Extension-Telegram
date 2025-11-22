@@ -20,6 +20,9 @@ Window {
         }
     }
 
+    // Separación vertical configurable entre burbujas
+    property int messageSpacing: 14
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -51,6 +54,19 @@ Window {
                     }
                     Label { text: "Total: " + messageModel.totalCount(); color: "#8fc1ff" }
                     Label { text: "Filtrados: " + messageModel.filteredCount(); color: "#8fc1ff" }
+                    ToolButton {
+                        id: settingsBtn
+                        text: "\u2699"
+                        onClicked: settingsPopup.open()
+                        background: Rectangle { radius: 6; color: settingsBtn.down ? "#2f486b" : (settingsBtn.hovered ? "#253652" : "transparent") }
+                        contentItem: Text {
+                            text: "\u2699"
+                            color: "#8fc1ff"
+                            font.pixelSize: 16
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
                 }
 
                 RowLayout {
@@ -90,7 +106,7 @@ Window {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 14
+            spacing: messageSpacing
             model: messageModel
             cacheBuffer: 4000
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
@@ -99,18 +115,15 @@ Window {
                 width: listView.width
                 property bool hasContent: (message && message.length > 0) || (hasMediaDir && media_abs)
                 visible: hasContent
-                implicitHeight: hasContent ? bubble.implicitHeight + 8 : 0
+                height: hasContent ? bubble.implicitHeight : 0
 
                 Rectangle {
                     id: bubble
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.leftMargin: 20
-                    anchors.rightMargin: 20
+                    anchors.horizontalCenter: parent.horizontalCenter
                     radius: 14
                     color: "#16243a"
                     border.color: "#2e4b70"
-                    implicitWidth: Math.min(listView.width * 0.85, 900)
+                    width: Math.min(listView.width * 0.85, 900)
                     implicitHeight: contentColumn.implicitHeight + 20
 
                     Column {
@@ -217,6 +230,30 @@ Window {
         if (dt.trim().length > 0) parts.push(dt.trim());
         if (message && message.length > 0) parts.push(message);
         if (hasMediaDir && media_file) parts.push("Archivo: " + media_file);
-        Qt.application.clipboard().setText(parts.join("\n"));
+        clipboardHelper.copy(parts.join("\n"));
     }
+
+    Popup {
+        id: settingsPopup
+        modal: true
+        focus: true
+        x: parent.width - width - 20
+        y: topColumn.height + 30
+        background: Rectangle { color: "#111c2d"; radius: 10; border.color: "#1d2f49" }
+
+        contentItem: ColumnLayout {
+            anchors.margins: 12
+            anchors.fill: parent
+            spacing: 10
+            Label { text: "Espaciado entre mensajes (px)"; color: "white"; font.pixelSize: 14 }
+            Slider {
+                id: spacingSlider
+                from: 4; to: 60; value: messageSpacing
+                onValueChanged: messageSpacing = Math.round(value)
+            }
+            Label { text: messageSpacing + " px"; color: "#8fc1ff" }
+            Button { text: "Cerrar"; onClicked: settingsPopup.close() }
+        }
+    }
+
 }

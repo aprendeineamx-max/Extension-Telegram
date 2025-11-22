@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl
+from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl, QObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -124,13 +124,18 @@ def load_messages(chat_dir: Path, has_media_dir: bool) -> List[dict]:
                 if candidate.exists():
                     media_abs = str(candidate.resolve())
 
+            # Evita agregar mensajes sin texto y sin media real (para que no aparezcan huecos)
+            text = obj.get("message")
+            if not text and not media_abs:
+                continue
+
             messages.append(
                 {
                     "id": obj.get("id"),
                     "date": obj.get("date"),  # ISO string
                     "date_display": date_disp,
                     "time_display": time_disp,
-                    "message": obj.get("message"),
+                    "message": text,
                     "sender": obj.get("sender_id"),
                     "media_type": obj.get("media_type"),
                     "media_file": media_file,
@@ -157,11 +162,17 @@ def main() -> None:
     app = QGuiApplication([])
     engine = QQmlApplicationEngine()
 
+    class ClipboardHelper(QObject):
+        @Slot(str)
+        def copy(self, text: str) -> None:
+            QGuiApplication.clipboard().setText(text)
+
     model = MessageModel(messages)
     engine.rootContext().setContextProperty("messageModel", model)
     engine.rootContext().setContextProperty("chatTitle", chat_dir.name)
     engine.rootContext().setContextProperty("mediaBasePath", str(chat_dir))
     engine.rootContext().setContextProperty("hasMediaDir", has_media_dir)
+    engine.rootContext().setContextProperty("clipboardHelper", ClipboardHelper())
 
     qml_path = Path(__file__).parent / "qml" / "Main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_path)))
