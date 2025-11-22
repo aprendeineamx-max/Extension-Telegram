@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl, QObject
+from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl, QObject, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -163,9 +163,16 @@ def main() -> None:
     engine = QQmlApplicationEngine()
 
     class ClipboardHelper(QObject):
-        @Slot(str)
-        def copy(self, text: str) -> None:
-            QGuiApplication.clipboard().setText(text)
+        copied = Signal()
+
+        @Slot(str, result=bool)
+        def copy(self, text: str) -> bool:
+            try:
+                QGuiApplication.clipboard().setText(text)
+                self.copied.emit()
+                return True
+            except Exception:
+                return False
 
     model = MessageModel(messages)
     engine.rootContext().setContextProperty("messageModel", model)

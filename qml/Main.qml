@@ -22,6 +22,7 @@ Window {
 
     // Separación vertical configurable entre burbujas
     property int messageSpacing: 14
+    property string toastText: ""
 
     ColumnLayout {
         anchors.fill: parent
@@ -154,31 +155,42 @@ Window {
                                 id: copyBtn
                                 implicitWidth: 28
                                 implicitHeight: 28
+                                property bool copied: false
                                 background: Rectangle {
                                     radius: 6
                                     color: copyBtn.down ? "#2f486b" : (copyBtn.hovered ? "#253652" : "transparent")
                                     border.color: "#3c5a82"
                                 }
                                 contentItem: Text {
-                                    text: "\u2398"  // icono dos rectángulos
+                                    text: copyBtn.copied ? "✔" : "\u2398"  // icono dos rectángulos
                                     color: "#8fc1ff"
                                     font.pixelSize: 16
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
-                                onClicked: copyMessage(sender, date_display, time_display, message, media_file, media_abs)
+                                Timer {
+                                    id: copyReset
+                                    interval: 1200; repeat: false; running: false
+                                    onTriggered: copyBtn.copied = false
+                                }
+                                onClicked: {
+                                    copyMessage(sender, date_display, time_display, message, media_file, media_abs);
+                                    copyBtn.copied = true;
+                                    copyReset.restart();
+                                }
                             }
                         }
 
-                        Text {
-                            width: parent.width
-                            visible: message && message.length > 0
-                            text: message
-                            color: "white"
-                            wrapMode: Text.Wrap
-                            font.pixelSize: 17
-                            maximumLineCount: 0
-                        }
+                            TextEdit {
+                                width: parent.width
+                                visible: message && message.length > 0
+                                text: message
+                                color: "white"
+                                wrapMode: TextEdit.Wrap
+                                font.pixelSize: 17
+                                readOnly: true
+                                selectByMouse: true
+                            }
 
                         Rectangle {
                             visible: hasMediaDir && media_abs
@@ -230,7 +242,13 @@ Window {
         if (dt.trim().length > 0) parts.push(dt.trim());
         if (message && message.length > 0) parts.push(message);
         if (hasMediaDir && media_file) parts.push("Archivo: " + media_file);
-        clipboardHelper.copy(parts.join("\n"));
+        let txt = parts.join("\n");
+        var ok = false;
+        if (typeof clipboardHelper !== "undefined" && clipboardHelper.copy) {
+            ok = clipboardHelper.copy(txt);
+        }
+        if (ok) showToast("Copiado");
+        else showToast("Error al copiar");
     }
 
     Popup {
@@ -256,4 +274,48 @@ Window {
         }
     }
 
+    Rectangle {
+        id: toast
+        visible: false
+        opacity: 0
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 16
+        radius: 8
+        color: "#111c2d"
+        border.color: "#1d2f49"
+        implicitWidth: toastLabel.implicitWidth + 20
+        implicitHeight: toastLabel.implicitHeight + 12
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Text {
+            id: toastLabel
+            anchors.centerIn: parent
+            color: "#8fc1ff"
+            text: toastText
+            font.pixelSize: 14
+        }
+    }
+
+    Timer {
+        id: toastTimer
+        interval: 1200
+        running: false
+        repeat: false
+        onTriggered: {
+            toast.opacity = 0;
+            toast.visible = false;
+        }
+    }
+
+    Connections {
+        target: clipboardHelper
+        function onCopied() { showToast("Copiado"); }
+    }
+
+    function showToast(text) {
+        toastText = text;
+        toast.visible = true;
+        toast.opacity = 1;
+        toastTimer.restart();
+    }
 }
