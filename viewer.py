@@ -11,7 +11,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl
 from PySide6.QtGui import QGuiApplication
@@ -28,8 +28,9 @@ class MessageModel(QAbstractListModel):
         "sender": Qt.UserRole + 4,
         "media_type": Qt.UserRole + 5,
         "media_file": Qt.UserRole + 6,
-        "date_display": Qt.UserRole + 7,
-        "time_display": Qt.UserRole + 8,
+        "media_abs": Qt.UserRole + 7,
+        "date_display": Qt.UserRole + 8,
+        "time_display": Qt.UserRole + 9,
     }
 
     def __init__(self, messages: List[dict]) -> None:
@@ -69,6 +70,7 @@ class MessageModel(QAbstractListModel):
         date_val = date_filter.strip()
         media = media_filter.strip()
         for msg in self._all:
+            has_media = bool(msg.get("media_abs"))
             if text and text not in (msg.get("message") or "").lower():
                 continue
             if sender and sender not in str(msg.get("sender", "")):
@@ -76,9 +78,9 @@ class MessageModel(QAbstractListModel):
             if date_val:
                 if not msg.get("date", "").startswith(date_val):
                     continue
-            if media == "media" and not msg.get("media_file") and not msg.get("media_type"):
+            if media == "media" and not has_media:
                 continue
-            if media == "nomedia" and (msg.get("media_file") or msg.get("media_type")):
+            if media == "nomedia" and has_media:
                 continue
             self._filtered.append(msg)
         self.endResetModel()
@@ -92,7 +94,7 @@ class MessageModel(QAbstractListModel):
         return len(self._filtered)
 
 
-def load_messages(chat_dir: Path) -> List[dict]:
+def load_messages(chat_dir: Path, has_media_dir: bool) -> List[dict]:
     messages_path = chat_dir / "messages.jsonl"
     if not messages_path.exists():
         raise FileNotFoundError(f"No se encontró {messages_path}")
@@ -114,6 +116,14 @@ def load_messages(chat_dir: Path) -> List[dict]:
                 except Exception:
                     date_disp = dt[:10]
                     time_disp = dt[11:16] if len(dt) >= 16 else ""
+
+            media_file = obj.get("media_file")
+            media_abs = None
+            if has_media_dir and media_file:
+                candidate = chat_dir / media_file
+                if candidate.exists():
+                    media_abs = str(candidate.resolve())
+
             messages.append(
                 {
                     "id": obj.get("id"),
@@ -123,7 +133,8 @@ def load_messages(chat_dir: Path) -> List[dict]:
                     "message": obj.get("message"),
                     "sender": obj.get("sender_id"),
                     "media_type": obj.get("media_type"),
-                    "media_file": obj.get("media_file"),
+                    "media_file": media_file,
+                    "media_abs": media_abs,
                 }
             )
     return messages
@@ -139,7 +150,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     chat_dir = args.chat_dir.expanduser()
-    messages = load_messages(chat_dir)
+    media_dir = chat_dir / "media"
+    has_media_dir = media_dir.exists() and any(media_dir.rglob("*"))
+    messages = load_messages(chat_dir, has_media_dir)
 
     app = QGuiApplication([])
     engine = QQmlApplicationEngine()
@@ -148,6 +161,7 @@ def main() -> None:
     engine.rootContext().setContextProperty("messageModel", model)
     engine.rootContext().setContextProperty("chatTitle", chat_dir.name)
     engine.rootContext().setContextProperty("mediaBasePath", str(chat_dir))
+    engine.rootContext().setContextProperty("hasMediaDir", has_media_dir)
 
     qml_path = Path(__file__).parent / "qml" / "Main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_path)))

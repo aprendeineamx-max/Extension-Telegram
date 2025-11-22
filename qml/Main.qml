@@ -97,74 +97,99 @@ Window {
 
             delegate: Item {
                 width: listView.width
-                height: bubble.implicitHeight + 8
+                property bool hasContent: (message && message.length > 0) || (hasMediaDir && media_abs)
+                visible: hasContent
+                implicitHeight: hasContent ? bubble.implicitHeight + 8 : 0
 
-                Item {
+                Rectangle {
                     id: bubble
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.leftMargin: 20
                     anchors.rightMargin: 20
-                    implicitHeight: card.implicitHeight
+                    radius: 14
+                    color: "#16243a"
+                    border.color: "#2e4b70"
+                    implicitWidth: Math.min(listView.width * 0.85, 900)
+                    implicitHeight: contentColumn.implicitHeight + 20
 
-                    Rectangle {
-                        id: card
-                        radius: 14
-                        color: "#16243a"
-                        border.color: "#2e4b70"
-                        anchors.left: parent.left
-                        width: Math.min(listView.width * 0.85, 900)
-                        anchors.horizontalCenter: undefined
-                        implicitHeight: contentColumn.implicitHeight + 28
+                    Column {
+                        id: contentColumn
+                        spacing: 8
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        width: parent.width - 28
 
-                        Column {
-                            id: contentColumn
-                            anchors.fill: parent
-                            anchors.margins: 14
+                        Row {
+                            width: parent.width
                             spacing: 8
-                            width: parent.width - 28
-
-                            Row {
-                                width: parent.width
-                                spacing: 8
-                                Text {
-                                    text: sender ? ("Sender: " + sender) : "Sender: (desconocido)"
-                                    color: "#d8e6ff"
-                                    font.bold: true
-                                    wrapMode: Text.NoWrap
-                                }
-                                Item { width: 1; Layout.fillWidth: true }
-                                Text {
-                                    text: date_display + " " + time_display
-                                    color: "#9ab"
-                                    wrapMode: Text.NoWrap
-                                }
-                            }
 
                             Text {
-                                width: parent.width
-                                text: (message && message.length > 0) ? message
-                                      : (media_type ? ("Media: " + media_type) : "(sin texto)")
-                                color: "white"
-                                wrapMode: Text.Wrap
-                                font.pixelSize: 17
-                                maximumLineCount: 0
+                                text: sender ? ("Sender: " + sender) : "Sender: (desconocido)"
+                                color: "#d8e6ff"
+                                font.bold: true
+                                wrapMode: Text.NoWrap
+                            }
+                            Item { Layout.fillWidth: true; width: 1 }
+                            Text {
+                                text: date_display + " " + time_display
+                                color: "#9ab"
+                                wrapMode: Text.NoWrap
                             }
 
-                            Rectangle {
-                                visible: media_file !== undefined && media_file !== null
-                                radius: 8
-                                color: "#22324c"
-                                border.color: "#30486b"
-                                width: parent.width
-                                implicitHeight: mediaText.implicitHeight + 14
+                            ToolButton {
+                                id: copyBtn
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                background: Rectangle {
+                                    radius: 6
+                                    color: copyBtn.down ? "#2f486b" : (copyBtn.hovered ? "#253652" : "transparent")
+                                    border.color: "#3c5a82"
+                                }
+                                contentItem: Text {
+                                    text: "\u2398"  // icono dos rectángulos
+                                    color: "#8fc1ff"
+                                    font.pixelSize: 16
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                onClicked: copyMessage(sender, date_display, time_display, message, media_file, media_abs)
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: message && message.length > 0
+                            text: message
+                            color: "white"
+                            wrapMode: Text.Wrap
+                            font.pixelSize: 17
+                            maximumLineCount: 0
+                        }
+
+                        Rectangle {
+                            visible: hasMediaDir && media_abs
+                            radius: 8
+                            color: "#22324c"
+                            border.color: "#30486b"
+                            width: parent.width
+                            implicitHeight: mediaRow.implicitHeight + 14
+                            Row {
+                                id: mediaRow
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 12
                                 Text {
                                     id: mediaText
-                                    anchors.fill: parent
-                                    anchors.margins: 8
                                     text: "Archivo: " + media_file
                                     color: "#8fc1ff"
                                     wrapMode: Text.Wrap
+                                    width: parent.width - openBtn.implicitWidth - 20
+                                }
+                                Button {
+                                    id: openBtn
+                                    text: "Abrir"
+                                    onClicked: Qt.openUrlExternally("file:///" + media_abs.replace(/\\\\/g, "/"))
                                 }
                             }
                         }
@@ -183,5 +208,15 @@ Window {
                     senderFilter.text,
                     dateFilter.text,
                     mediaVal);
+    }
+
+    function copyMessage(sender, date_display, time_display, message, media_file, media_abs) {
+        let parts = [];
+        if (sender) parts.push("Sender: " + sender);
+        let dt = (date_display || "") + (time_display ? " " + time_display : "");
+        if (dt.trim().length > 0) parts.push(dt.trim());
+        if (message && message.length > 0) parts.push(message);
+        if (hasMediaDir && media_file) parts.push("Archivo: " + media_file);
+        Qt.application.clipboard().setText(parts.join("\n"));
     }
 }
