@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import Qt.labs.platform 1.1
 
 Window {
     visible: true
@@ -10,30 +11,31 @@ Window {
     minimumWidth: 900
     minimumHeight: 700
     title: "Visor de Telegram - " + chatTitle
-    color: "#0b1422"
+    color: backgroundColor
 
-    Rectangle {
-        anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: "#0b1422" }
-            GradientStop { position: 1.0; color: "#0f1d2f" }
-        }
-    }
-
-    // Separación vertical configurable entre burbujas
     property int messageSpacing: 14
     property string toastText: ""
     property int messageFontSize: 17
     property color messageFontColor: "white"
     property bool allowSelection: true
-    property var colorOptions: ["#ffffff", "#c7d9ff", "#ffd166", "#8fc1ff", "#a0f0c5", "#ff8fa3", "#d3b8ff"]
+    property var colorOptionsPrimary: ["#ffffff", "#c7d9ff", "#ffd166", "#8fc1ff", "#a0f0c5"]
+    property var colorOptionsMore: ["#ff8fa3", "#d3b8ff", "#ffcf9f", "#9df3ff", "#e3e3e3"]
+    property bool showMoreColors: false
+    property color backgroundColor: "#0b1422"
+    property real backgroundOpacity: 1.0
+    property var backgroundPalette: ["#0b1422", "#0f1d2f", "#111c2d", "#1b2435", "#22324c"]
+
+    Rectangle {
+        anchors.fill: parent
+        color: backgroundColor
+        opacity: backgroundOpacity
+    }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 12
 
-        // Barra de filtros y título
         Rectangle {
             Layout.fillWidth: true
             radius: 12
@@ -82,30 +84,45 @@ Window {
                         placeholderText: "Buscar en mensaje"
                         Layout.fillWidth: true
                         onTextChanged: applyFilters()
+                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                        color: "#e6edf7"
+                        placeholderTextColor: "#5f6f8c"
                     }
                     TextField {
                         id: senderFilter
                         placeholderText: "Sender ID"
                         Layout.preferredWidth: 150
                         onTextChanged: applyFilters()
+                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                        color: "#e6edf7"
+                        placeholderTextColor: "#5f6f8c"
                     }
                     TextField {
                         id: dateFilter
                         placeholderText: "YYYY-MM-DD"
                         Layout.preferredWidth: 140
                         onTextChanged: applyFilters()
+                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                        color: "#e6edf7"
+                        placeholderTextColor: "#5f6f8c"
                     }
                     ComboBox {
                         id: mediaCombo
                         Layout.preferredWidth: 140
                         model: ["Todos", "Solo media", "Solo texto"]
                         onCurrentIndexChanged: applyFilters()
+                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                        contentItem: Text {
+                            text: mediaCombo.displayText
+                            color: "#e6edf7"
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 8
+                        }
                     }
                 }
             }
         }
 
-        // Lista de mensajes estilo burbuja
         ListView {
             id: listView
             Layout.fillWidth: true
@@ -141,7 +158,6 @@ Window {
                         Row {
                             width: parent.width
                             spacing: 8
-
                             Text {
                                 text: sender ? ("Sender: " + sender) : "Sender: (desconocido)"
                                 color: "#d8e6ff"
@@ -154,7 +170,6 @@ Window {
                                 color: "#9ab"
                                 wrapMode: Text.NoWrap
                             }
-
                             ToolButton {
                                 id: copyBtn
                                 implicitWidth: 28
@@ -166,17 +181,13 @@ Window {
                                     border.color: "#3c5a82"
                                 }
                                 contentItem: Text {
-                                    text: copyBtn.copied ? "✔" : "\u2398"  // icono dos rectángulos
+                                    text: copyBtn.copied ? "✔" : "\u2398"
                                     color: "#8fc1ff"
                                     font.pixelSize: 16
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
-                                Timer {
-                                    id: copyReset
-                                    interval: 1200; repeat: false; running: false
-                                    onTriggered: copyBtn.copied = false
-                                }
+                                Timer { id: copyReset; interval: 1200; repeat: false; running: false; onTriggered: copyBtn.copied = false }
                                 onClicked: {
                                     copyMessage(sender, date_display, time_display, message, media_file, media_abs);
                                     copyBtn.copied = true;
@@ -219,7 +230,7 @@ Window {
                                 Button {
                                     id: openBtn
                                     text: "Abrir"
-                                    onClicked: Qt.openUrlExternally("file:///" + media_abs.replace(/\\\\/g, "/"))
+                                    onClicked: Qt.openUrlExternally("file:///" + media_abs.replace(/\\/g, "/"))
                                 }
                             }
                         }
@@ -233,11 +244,7 @@ Window {
         let mediaVal = "";
         if (mediaCombo.currentIndex === 1) mediaVal = "media";
         else if (mediaCombo.currentIndex === 2) mediaVal = "nomedia";
-        messageModel.applyFilters(
-                    textFilter.text,
-                    senderFilter.text,
-                    dateFilter.text,
-                    mediaVal);
+        messageModel.applyFilters(textFilter.text, senderFilter.text, dateFilter.text, mediaVal);
     }
 
     function copyMessage(sender, date_display, time_display, message, media_file, media_abs) {
@@ -252,15 +259,10 @@ Window {
         if (typeof clipboardHelper !== "undefined" && clipboardHelper.copy) {
             ok = clipboardHelper.copy(txt);
         }
-        // Fallback directo a Qt clipboard
         if (!ok && Qt && Qt.application && Qt.application.clipboard) {
-            try {
-                Qt.application.clipboard.setText(txt);
-                ok = true;
-            } catch (e) { ok = false; }
+            try { Qt.application.clipboard.setText(txt); ok = true; } catch (e) { ok = false; }
         }
-        if (ok) showToast("Copiado");
-        else showToast("Error al copiar");
+        showToast(ok ? "Copiado" : "Error al copiar");
     }
 
     Popup {
@@ -275,47 +277,51 @@ Window {
             anchors.margins: 12
             anchors.fill: parent
             spacing: 10
+
             Label { text: "Espaciado entre mensajes (px)"; color: "white"; font.pixelSize: 14 }
-            Slider {
-                id: spacingSlider
-                from: 4; to: 60; value: messageSpacing
-                onValueChanged: messageSpacing = Math.round(value)
-            }
+            Slider { id: spacingSlider; from: 4; to: 60; value: messageSpacing; onValueChanged: messageSpacing = Math.round(value) }
             Label { text: messageSpacing + " px"; color: "#8fc1ff" }
 
             Label { text: "Tamaño de fuente"; color: "white"; font.pixelSize: 14 }
-            Slider {
-                id: fontSlider
-                from: 12; to: 28; value: messageFontSize
-                onValueChanged: messageFontSize = Math.round(value)
-            }
+            Slider { id: fontSlider; from: 12; to: 28; value: messageFontSize; onValueChanged: messageFontSize = Math.round(value) }
             Label { text: messageFontSize + " px"; color: "#8fc1ff" }
 
             Label { text: "Color de fuente"; color: "white"; font.pixelSize: 14 }
-            Flow {
-                width: parent.width
+            Grid {
+                columns: 5
                 spacing: 6
                 Repeater {
-                    model: colorOptions
+                    model: showMoreColors ? colorOptionsPrimary.concat(colorOptionsMore) : colorOptionsPrimary
                     delegate: Rectangle {
-                        width: 28; height: 28; radius: 6
+                        width: 26; height: 26; radius: 6
                         color: modelData
                         border.color: messageFontColor === modelData ? "#8fc1ff" : "#1d2f49"
                         border.width: 2
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: messageFontColor = modelData
-                        }
+                        MouseArea { anchors.fill: parent; onClicked: messageFontColor = modelData }
                     }
                 }
             }
+            Button { text: showMoreColors ? "Ver menos colores" : "Ver más colores"; onClicked: showMoreColors = !showMoreColors }
 
-            CheckBox {
-                id: selectionToggle
-                text: "Permitir seleccionar texto"
-                checked: allowSelection
-                onCheckedChanged: allowSelection = checked
+            Label { text: "Color de fondo"; color: "white"; font.pixelSize: 14 }
+            Grid {
+                columns: 5
+                spacing: 6
+                Repeater {
+                    model: backgroundPalette
+                    delegate: Rectangle {
+                        width: 26; height: 26; radius: 6
+                        color: modelData
+                        border.color: backgroundColor === modelData ? "#8fc1ff" : "#1d2f49"
+                        border.width: 2
+                        MouseArea { anchors.fill: parent; onClicked: backgroundColor = modelData }
+                    }
+                }
             }
+            CheckBox { text: "Fondo translúcido"; checked: backgroundOpacity < 1.0; onCheckedChanged: backgroundOpacity = checked ? 0.82 : 1.0 }
+            Button { text: "Restablecer fondo por defecto"; onClicked: { backgroundColor = "#0b1422"; backgroundOpacity = 1.0; } }
+
+            CheckBox { id: selectionToggle; text: "Permitir seleccionar texto"; checked: allowSelection; onCheckedChanged: allowSelection = checked }
 
             Button { text: "Cerrar"; onClicked: settingsPopup.close() }
         }
@@ -348,10 +354,7 @@ Window {
         interval: 1200
         running: false
         repeat: false
-        onTriggered: {
-            toast.opacity = 0;
-            toast.visible = false;
-        }
+        onTriggered: { toast.opacity = 0; toast.visible = false }
     }
 
     Connections {
