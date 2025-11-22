@@ -23,6 +23,10 @@ Window {
     // Separación vertical configurable entre burbujas
     property int messageSpacing: 14
     property string toastText: ""
+    property int messageFontSize: 17
+    property color messageFontColor: "white"
+    property bool allowSelection: true
+    property var colorOptions: ["#ffffff", "#c7d9ff", "#ffd166", "#8fc1ff", "#a0f0c5", "#ff8fa3", "#d3b8ff"]
 
     ColumnLayout {
         anchors.fill: parent
@@ -181,16 +185,17 @@ Window {
                             }
                         }
 
-                            TextEdit {
-                                width: parent.width
-                                visible: message && message.length > 0
-                                text: message
-                                color: "white"
-                                wrapMode: TextEdit.Wrap
-                                font.pixelSize: 17
-                                readOnly: true
-                                selectByMouse: true
-                            }
+                        TextEdit {
+                            width: parent.width
+                            visible: message && message.length > 0
+                            text: message
+                            color: messageFontColor
+                            wrapMode: TextEdit.Wrap
+                            font.pixelSize: messageFontSize
+                            readOnly: true
+                            selectByMouse: allowSelection
+                            selectByKeyboard: allowSelection
+                        }
 
                         Rectangle {
                             visible: hasMediaDir && media_abs
@@ -247,6 +252,13 @@ Window {
         if (typeof clipboardHelper !== "undefined" && clipboardHelper.copy) {
             ok = clipboardHelper.copy(txt);
         }
+        // Fallback directo a Qt clipboard
+        if (!ok && Qt && Qt.application && Qt.application.clipboard) {
+            try {
+                Qt.application.clipboard.setText(txt);
+                ok = true;
+            } catch (e) { ok = false; }
+        }
         if (ok) showToast("Copiado");
         else showToast("Error al copiar");
     }
@@ -270,6 +282,41 @@ Window {
                 onValueChanged: messageSpacing = Math.round(value)
             }
             Label { text: messageSpacing + " px"; color: "#8fc1ff" }
+
+            Label { text: "Tamaño de fuente"; color: "white"; font.pixelSize: 14 }
+            Slider {
+                id: fontSlider
+                from: 12; to: 28; value: messageFontSize
+                onValueChanged: messageFontSize = Math.round(value)
+            }
+            Label { text: messageFontSize + " px"; color: "#8fc1ff" }
+
+            Label { text: "Color de fuente"; color: "white"; font.pixelSize: 14 }
+            Flow {
+                width: parent.width
+                spacing: 6
+                Repeater {
+                    model: colorOptions
+                    delegate: Rectangle {
+                        width: 28; height: 28; radius: 6
+                        color: modelData
+                        border.color: messageFontColor === modelData ? "#8fc1ff" : "#1d2f49"
+                        border.width: 2
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: messageFontColor = modelData
+                        }
+                    }
+                }
+            }
+
+            CheckBox {
+                id: selectionToggle
+                text: "Permitir seleccionar texto"
+                checked: allowSelection
+                onCheckedChanged: allowSelection = checked
+            }
+
             Button { text: "Cerrar"; onClicked: settingsPopup.close() }
         }
     }

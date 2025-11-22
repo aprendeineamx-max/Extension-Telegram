@@ -169,6 +169,11 @@ def main() -> None:
         def copy(self, text: str) -> bool:
             try:
                 QGuiApplication.clipboard().setText(text)
+                # fallback: also set selection clipboard when available (Linux); no-op on Windows
+                try:
+                    QGuiApplication.clipboard().setText(text, QGuiApplication.clipboard().Selection)
+                except Exception:
+                    pass
                 self.copied.emit()
                 return True
             except Exception:
