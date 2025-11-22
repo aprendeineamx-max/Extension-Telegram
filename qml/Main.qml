@@ -331,6 +331,7 @@ Window {
         id: toast
         visible: false
         opacity: 0
+        z: 999
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 16

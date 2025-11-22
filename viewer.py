@@ -11,6 +11,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+import subprocess
 from typing import List
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl, QObject, Signal
@@ -65,6 +66,7 @@ class MessageModel(QAbstractListModel):
         """
         self.beginResetModel()
         self._filtered = []
+        seen_ids = set()
         text = text_filter.lower().strip()
         sender = sender_filter.strip()
         date_val = date_filter.strip()
@@ -82,6 +84,10 @@ class MessageModel(QAbstractListModel):
                 continue
             if media == "nomedia" and has_media:
                 continue
+            msg_id = msg.get("id")
+            if msg_id in seen_ids:
+                continue
+            seen_ids.add(msg_id)
             self._filtered.append(msg)
         self.endResetModel()
 
@@ -169,15 +175,27 @@ def main() -> None:
         def copy(self, text: str) -> bool:
             try:
                 QGuiApplication.clipboard().setText(text)
-                # fallback: also set selection clipboard when available (Linux); no-op on Windows
                 try:
                     QGuiApplication.clipboard().setText(text, QGuiApplication.clipboard().Selection)
                 except Exception:
                     pass
-                self.copied.emit()
-                return True
+                ok = True
             except Exception:
-                return False
+                ok = False
+            if not ok:
+                try:
+                    subprocess.run(["clip"], input=text.encode("utf-16le"), check=True)
+                    ok = True
+                except Exception:
+                    ok = False
+            try:
+                log_path = Path.cwd() / "copy_log.txt"
+                log_path.write_text(text, encoding="utf-8")
+            except Exception:
+                pass
+            if ok:
+                self.copied.emit()
+            return ok
 
     model = MessageModel(messages)
     engine.rootContext().setContextProperty("messageModel", model)
