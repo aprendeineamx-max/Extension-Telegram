@@ -39,6 +39,13 @@ Parámetros útiles:
 
 La primera ejecución pedirá el código de inicio de sesión (y contraseña 2FA si aplica). Las siguientes usarán el archivo de sesión guardado.
 
+## Visor de mensajes (Qt + QML)
+Instala PySide6 (ya en `requirements.txt`) y ejecuta el visor apuntando a un chat exportado:
+```bash
+python viewer.py --chat-dir "C:\Users\Administrador\Desktop\TelegramBackups\-1003146600095_METODOS ANGEL"
+```
+Permite filtrar por texto, sender_id, fecha (YYYY-MM-DD) y si tiene multimedia. Lee `messages.jsonl` y muestra los archivos asociados (ruta relativa).
+
 ## Salida
 - `TelegramBackups/sessions/`: archivo de sesión de Telethon.
 - `TelegramBackups/<id>_<nombre>/chat.json`: metadatos básicos del chat.
