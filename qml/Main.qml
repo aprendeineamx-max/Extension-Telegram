@@ -53,7 +53,7 @@ Window {
                     Layout.fillWidth: true
                     spacing: 10
                     Label {
-                        text: chatTitle
+                        text: chatLoader ? chatLoader.currentTitle : chatTitle
                         color: "white"
                         font.pixelSize: 22
                         font.bold: true
@@ -76,47 +76,120 @@ Window {
                     }
                 }
 
-                RowLayout {
+                ColumnLayout {
+                    spacing: 6
                     Layout.fillWidth: true
-                    spacing: 8
-                    TextField {
-                        id: textFilter
-                        placeholderText: "Buscar en mensaje"
+
+                    RowLayout {
                         Layout.fillWidth: true
-                        onTextChanged: applyFilters()
-                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
-                        color: "#e6edf7"
-                        placeholderTextColor: "#5f6f8c"
-                    }
-                    TextField {
-                        id: senderFilter
-                        placeholderText: "Sender ID"
-                        Layout.preferredWidth: 150
-                        onTextChanged: applyFilters()
-                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
-                        color: "#e6edf7"
-                        placeholderTextColor: "#5f6f8c"
-                    }
-                    TextField {
-                        id: dateFilter
-                        placeholderText: "YYYY-MM-DD"
-                        Layout.preferredWidth: 140
-                        onTextChanged: applyFilters()
-                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
-                        color: "#e6edf7"
-                        placeholderTextColor: "#5f6f8c"
-                    }
-                    ComboBox {
-                        id: mediaCombo
-                        Layout.preferredWidth: 140
-                        model: ["Todos", "Solo media", "Solo texto"]
-                        onCurrentIndexChanged: applyFilters()
-                        background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
-                        contentItem: Text {
-                            text: mediaCombo.displayText
+                        spacing: 8
+                        TextField {
+                            id: textFilter
+                            placeholderText: "Buscar en mensaje"
+                            Layout.fillWidth: true
+                            onTextChanged: applyFilters()
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
                             color: "#e6edf7"
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 8
+                            placeholderTextColor: "#5f6f8c"
+                        }
+                        TextField {
+                            id: senderFilter
+                            placeholderText: "Sender ID"
+                            Layout.preferredWidth: 150
+                            onTextChanged: applyFilters()
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                            color: "#e6edf7"
+                            placeholderTextColor: "#5f6f8c"
+                        }
+                        TextField {
+                            id: dateFilter
+                            placeholderText: "YYYY-MM-DD"
+                            Layout.preferredWidth: 140
+                            onTextChanged: applyFilters()
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                            color: "#e6edf7"
+                            placeholderTextColor: "#5f6f8c"
+                        }
+                        ComboBox {
+                            id: mediaCombo
+                            Layout.preferredWidth: 140
+                            model: ["Todos", "Solo media", "Solo texto"]
+                            onCurrentIndexChanged: applyFilters()
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                            contentItem: Text {
+                                text: mediaCombo.displayText
+                                color: "#e6edf7"
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 8
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: 8
+                        Layout.fillWidth: true
+                        TextField {
+                            id: baseDirField
+                            placeholderText: "Carpeta base para grupos/topics"
+                            text: chatLoader ? chatLoader.getBaseDir() : ""
+                            Layout.fillWidth: true
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                            color: "#e6edf7"
+                            placeholderTextColor: "#5f6f8c"
+                        }
+                        Button { text: "Guardar"; onClicked: { if (chatLoader) chatLoader.setBaseDir(baseDirField.text); } }
+                        Button { text: "Refrescar lista"; onClicked: { if (chatLoader) chatLoader.refreshChats(); } }
+                    }
+
+                    RowLayout {
+                        spacing: 8
+                        Layout.fillWidth: true
+                        TextField {
+                            id: linkField
+                            placeholderText: "URL o chat_id para extraer topics"
+                            Layout.fillWidth: true
+                            background: Rectangle { radius: 8; color: "#0f1d2f"; border.color: "#1f3250" }
+                            color: "#e6edf7"
+                            placeholderTextColor: "#5f6f8c"
+                        }
+                        Button {
+                            text: "Extraer topics"
+                            onClicked: {
+                                if (chatLoader) {
+                                    // Por ahora solo refresca; extracción requiere integrar backend async
+                                    chatLoader.refreshChats();
+                                }
+                            }
+                        }
+                    }
+
+                    ListView {
+                        id: chatsList
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 160
+                        model: chatsModel
+                        clip: true
+                        delegate: Rectangle {
+                            height: 34
+                            width: chatsList.width
+                            color: ListView.isCurrentItem ? "#1f2f48" : "transparent"
+                            radius: 6
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                text: model.title
+                                color: "#e6edf7"
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    chatsList.currentIndex = index;
+                                    if (chatLoader) {
+                                        chatLoader.loadChat(model.path);
+                                    }
+                                }
+                            }
                         }
                     }
                 }

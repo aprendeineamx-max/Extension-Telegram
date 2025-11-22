@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 import subprocess
-from typing import List
+from typing import List, Dict, Any
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, QByteArray, Slot, QUrl, QObject, Signal
 from PySide6.QtGui import QGuiApplication
@@ -55,6 +55,22 @@ class MessageModel(QAbstractListModel):
 
     def roleNames(self):  # type: ignore[override]
         return {role: QByteArray(name.encode()) for name, role in self.ROLE_MAP.items()}
+
+    @Slot(str, result=bool)
+    def loadFromPath(self, chat_dir: str) -> bool:
+        try:
+            path = Path(chat_dir)
+            media_dir = path / "media"
+            has_media_dir = media_dir.exists() and any(media_dir.rglob("*"))
+            messages = load_messages(path, has_media_dir)
+        except Exception as e:
+            print(f"loadFromPath error: {e}")
+            return False
+        self.beginResetModel()
+        self._all = messages
+        self._filtered = list(messages)
+        self.endResetModel()
+        return True
 
     @Slot(str, str, str, str)
     def applyFilters(self, text_filter: str, sender_filter: str, date_filter: str, media_filter: str) -> None:
@@ -197,12 +213,104 @@ def main() -> None:
                 self.copied.emit()
             return ok
 
+    class ChatLoader(QObject):
+        chatsUpdated = Signal(list)
+        currentTitleChanged = Signal(str)
+
+        def __init__(self, message_model: MessageModel, config_path: Path, engine_ref):
+            super().__init__()
+            self.message_model = message_model
+            self.config_path = config_path
+            self.engine_ref = engine_ref
+            cfg = self._load_config()
+            self.base_dir = cfg.get("base_dir") or self.default_base_dir()
+            self.current_title = cfg.get("last_chat_title") or ""
+            self.current_path = cfg.get("last_chat_path") or ""
+
+        @Slot(str, result=bool)
+        def setBaseDir(self, path: str) -> bool:
+            p = Path(path).expanduser()
+            try:
+                p.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"setBaseDir error: {e}")
+                return False
+            self.base_dir = str(p)
+            self._save_config()
+            self.refreshChats()
+            return True
+
+        @Slot(result=str)
+        def getBaseDir(self) -> str:
+            return self.base_dir
+
+        @Slot()
+        def refreshChats(self) -> None:
+            chats = self._scan_chats()
+            self.chatsUpdated.emit(chats)
+
+        @Slot(str, result=bool)
+        def loadChat(self, path: str) -> bool:
+            ok = self.message_model.loadFromPath(path)
+            if ok:
+                self.current_path = path
+                self.current_title = Path(path).name
+                self.currentTitleChanged.emit(self.current_title)
+                try:
+                    self.engine_ref.rootContext().setContextProperty("chatTitle", self.current_title)
+                except Exception:
+                    pass
+                self._save_config()
+            return ok
+
+        def _scan_chats(self) -> List[Dict[str, Any]]:
+            base = Path(self.base_dir) if self.base_dir else Path(self.default_base_dir())
+            chats: List[Dict[str, Any]] = []
+            if not base.exists():
+                return chats
+            for d in base.iterdir():
+                if not d.is_dir():
+                    continue
+                msg_file = d / "messages.jsonl"
+                if msg_file.exists():
+                    chats.append({"title": d.name, "path": str(d)})
+                for sub in d.glob("topic_*"):
+                    if (sub / "messages.jsonl").exists():
+                        chats.append({"title": f"{d.name} / {sub.name}", "path": str(sub)})
+            return chats
+
+        def _load_config(self) -> Dict[str, Any]:
+            if self.config_path.exists():
+                try:
+                    return json.loads(self.config_path.read_text(encoding="utf-8"))
+                except Exception:
+                    return {}
+            return {}
+
+        def _save_config(self) -> None:
+            try:
+                data = {
+                    "base_dir": self.base_dir,
+                    "last_chat_title": self.current_title,
+                    "last_chat_path": self.current_path,
+                }
+                self.config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as e:
+                print(f"save_config error: {e}")
+
+        @staticmethod
+        def default_base_dir() -> str:
+            desktop = Path.home() / "Desktop"
+            return str(desktop / "TelegramBackups") if desktop.exists() else str(Path.cwd() / "TelegramBackups")
+
     model = MessageModel(messages)
     engine.rootContext().setContextProperty("messageModel", model)
     engine.rootContext().setContextProperty("chatTitle", chat_dir.name)
     engine.rootContext().setContextProperty("mediaBasePath", str(chat_dir))
     engine.rootContext().setContextProperty("hasMediaDir", has_media_dir)
     engine.rootContext().setContextProperty("clipboardHelper", ClipboardHelper())
+    chat_loader = ChatLoader(model, Path(__file__).parent / "config.json", engine)
+    engine.rootContext().setContextProperty("chatLoader", chat_loader)
 
     qml_path = Path(__file__).parent / "qml" / "Main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_path)))

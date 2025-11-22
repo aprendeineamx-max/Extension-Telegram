@@ -46,6 +46,17 @@ python viewer.py --chat-dir "C:\Users\Administrador\Desktop\TelegramBackups\-100
 ```
 Permite filtrar por texto, sender_id, fecha (YYYY-MM-DD) y si tiene multimedia. Lee `messages.jsonl` y muestra los archivos asociados (ruta relativa).
 
+## Exportar temas de un grupo/canal con foros
+Si tu grupo usa topics (como los "chats" internos de un foro), puedes exportarlos todos con:
+```bash
+python export_topics.py --link https://web.telegram.org/k/#-3146600095
+```
+Esto creará una carpeta `TelegramBackupsTopics/<chat_id>/topic_<id>_<titulo>/` con `messages.jsonl` y media por cada topic. Ajustes opcionales:
+- `--limit 500` para limitar mensajes por topic.
+- `--skip-media` para no descargar archivos.
+- `--output <ruta>` para cambiar la carpeta base de salida.
+- `--chat-id -1003146600095` si prefieres pasar el id directamente.
+
 ## Salida
 - `TelegramBackups/sessions/`: archivo de sesión de Telethon.
 - `TelegramBackups/<id>_<nombre>/chat.json`: metadatos básicos del chat.
